@@ -58,10 +58,10 @@ def ffmpegToHSV(input:str,uid:str,scale:int):
         except OSError as e:
             print("Error: %s : %s" % (path2, e.strerror))
 
-@app.route('/convert_hsv', methods=['POST'])
+@app.route('/convert_hsv')
 def convert_hsv_by_url():
     try:        
-       url= request.form.get("url")
+       url= request.args.get("url")
        uuidFour = uuid.uuid4()     
        p1 = Process(target=ffmpegToHSV, args=(url,str(uuidFour),240))
        p2 = Process(target=ffmpegToHSV, args=(url,str(uuidFour),360))  
