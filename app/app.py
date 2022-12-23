@@ -105,8 +105,10 @@ def convert_hsv_by_url():
         print(e.stderr.decode(), file=sys.stderr)
 
 
-@app.route('/get_stats/<string:id>/<string:quality>')
-def get_stats_by_quality(id:str,quality:str):
+@app.route('/get_stats')
+def get_stats_by_quality():
+    id= request.args.get("id")
+    quality= request.args.get("quality")
     with open(os.path.join(id,f"{quality}.txt"), "r") as f:                
         return f.read()
 
