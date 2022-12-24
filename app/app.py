@@ -1,5 +1,5 @@
 from multiprocessing import Event, Process
-from flask import Flask,render_template,send_file,request
+from flask import Flask,render_template,send_file,request,jsonify
 import socket
 import ffmpeg
 import os
@@ -27,7 +27,7 @@ def upload_single_object(file:str,outfile:str,uid:str):
     except Exception as err:
         print(err)
 
-def upload_objects(input:str,uid:str):
+def upload_objects(input:str,uid:str,quality:int,rootpath:str):
     try:
         bucket_name = "mymedia" #s3 bucket name
         root_path = input # local folder for upload
@@ -37,8 +37,18 @@ def upload_objects(input:str,uid:str):
         for path, subdirs, files in os.walk(root_path):
             path = path.replace("\\","/")
             directory_name = path.replace(root_path,"")
+            i=0
+            fileslen=len(files)
             for file in files:
+                i=i+1
+                percentage=i/fileslen*100
                 my_bucket.upload_file(os.path.join(path, file), uid+'/'+file,ExtraArgs={'ACL':'public-read'})
+                with open(os.path.join(rootpath,f"{quality}.txt"), "w") as f:                
+                    f.write(f"UPLOAD:{percentage}")
+                    f.truncate()
+            with open(os.path.join(rootpath,f"{quality}.txt"), "w") as f:                
+                    f.write(f"DONE")
+                    f.truncate()        
 
     except Exception as err:
         print(err)
@@ -56,7 +66,7 @@ def ffmpegToHSV(input:str,uid:str,width:int,height:int):
     def handle_progress_info(percentage, speed, eta, estimated_filesize):
         if not percentage == None:
             with open(os.path.join(path1,f"{width}.txt"), "w") as f:                
-                f.write(str(percentage))
+                f.write(f"CONVERT:{percentage}")
                 f.truncate()        
             print(f"Id: {uid} Quality: {width}, Percent: {percentage}, Speed: {speed}, Eta: {eta}",flush=True)
 
@@ -74,10 +84,10 @@ def ffmpegToHSV(input:str,uid:str,width:int,height:int):
     #video = input.video.filter('scale', height, width)
     #output_stream = ffmpeg.output(video,audio, path2 + '/' + str(width) + '.m3u8', acodec='aac',strict='experimental',aspect='16:9', vcodec='libx264', format='hls', start_number=0, hls_time=2, hls_list_size=1000000)
     #ffmpeg.run(output_stream)
-    process = FfmpegProcess(["ffmpeg", "-i", input, "-c:a", "aac", "-strict","experimental","-c:v","libx264","-s",f"{height}x{width}", "-aspect","16:9","-f","hls","-hls_list_size","1000000","-hls_time","2", path2 + '/' + str(width) + '.m3u8'])
+    process = FfmpegProcess(["ffmpeg", "-i", input,"-i","logo.png","-filter_complex","overlay=60:10", "-c:a", "aac", "-strict","experimental","-c:v","libx264","-s",f"{height}x{width}", "-aspect","16:9","-f","hls","-hls_list_size","1000000","-hls_time","2", path2 + '/' + str(width) + '.m3u8'])
     ffmpeg_output_path = 'ffmpeg_output.txt'
     process.run(progress_handler=handle_progress_info,ffmpeg_output_file=ffmpeg_output_path,  error_handler=handle_error)   
-    upload_objects(path2,uid)
+    upload_objects(path2,uid,width,path1)
     try:
         shutil.rmtree(path2)
     except OSError as e:
@@ -111,6 +121,33 @@ def get_stats_by_quality():
     quality= request.args.get("quality")
     with open(os.path.join(id,f"{quality}.txt"), "r") as f:                
         return f.read()
+@app.route('/get_all_stats')
+def get_all_stats():
+    id= request.args.get("id")
+    p240=""
+    p360=""
+    p480=""
+    p540=""
+    p720=""
+    with open(os.path.join(id,f"{240}.txt"), "r") as f:                
+        p240= f.read()
+    with open(os.path.join(id,f"{360}.txt"), "r") as f:                
+        p360= f.read()
+    with open(os.path.join(id,f"{480}.txt"), "r") as f:                
+        p480= f.read()
+    with open(os.path.join(id,f"{540}.txt"), "r") as f:                
+        p540= f.read()
+    with open(os.path.join(id,f"{720}.txt"), "r") as f:                
+        p720= f.read()
+    data = {
+        'q240':p240,
+        'q360':p360,
+        'q480':p480,
+        'q540':p540,
+        'q720':p720,
+        'id':id
+    }
+    return jsonify(data)
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080)
