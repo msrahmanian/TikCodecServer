@@ -8,6 +8,7 @@ import uuid
 import shutil
 import boto3
 from better_ffmpeg_progress import FfmpegProcess
+import requests
 
 s3_resource = boto3.resource(
         's3',
@@ -48,7 +49,10 @@ def upload_objects(input:str,uid:str,quality:int,rootpath:str):
                     f.truncate()
             with open(os.path.join(rootpath,f"{quality}.txt"), "w") as f:                
                     f.write(f"DONE")
-                    f.truncate()        
+                    f.truncate()
+                    if(quality==720):
+                        requests.get(url = 'https://media.tikschool.ir/video/completevideo?Uid='+uid)
+
 
     except Exception as err:
         print(err)
